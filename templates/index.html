@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#121821">
+    <meta name="description" content="AI-powered Bengali news summaries with voice playback">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="বাংলা খবর">
+
+    <title>বাংলা খবর - AI News</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Icons for different devices -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-512.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+
+    <!-- Bengali Font Support (Google Fonts) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- App Container -->
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-title">
+                    <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+                    </svg>
+                    <h1>বাংলা খবর</h1>
+                </div>
+                <div class="header-info">
+                    <span id="newsCount" class="news-counter">...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Loading Spinner -->
+        <div id="loading" class="loading">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p class="loading-text">সংবাদ লোড হচ্ছে...</p>
+                <p class="loading-subtext">Please wait</p>
+            </div>
+        </div>
+
+        <!-- Cards Container -->
+        <div id="cardsContainer" class="cards-container">
+            <!-- Cards will be dynamically inserted here -->
+        </div>
+
+        <!-- Navigation Controls -->
+        <div class="navigation-controls">
+            <!-- Navigation Dots -->
+            <div id="navDots" class="nav-dots">
+                <!-- Dots will be dynamically inserted here -->
+            </div>
+
+            <!-- Swipe Navigation Arrows -->
+            <div class="swipe-arrows">
+                <button id="prevBtn" class="nav-arrow nav-arrow-left" aria-label="Previous">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                </button>
+                <button id="nextBtn" class="nav-arrow nav-arrow-right" aria-label="Next">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- iOS Install Prompt -->
+        <div id="iosInstallPrompt" class="ios-install-prompt hidden">
+            <div class="ios-prompt-content">
+                <button class="ios-prompt-close" id="iosPromptClose">×</button>
+                <div class="ios-prompt-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17 3H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H7V5h10v14z"/>
+                    </svg>
+                </div>
+                <h3>Install App</h3>
+                <p>এই অ্যাপটি আপনার হোম স্ক্রিনে যোগ করুন</p>
+                <div class="ios-prompt-steps">
+                    <p>1. Tap the <strong>Share</strong> button
+                        <svg style="width:20px;height:20px;vertical-align:middle" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                        </svg>
+                    </p>
+                    <p>2. Select <strong>"Add to Home Screen"</strong></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Install PWA Button (for Android/Desktop) -->
+        <button id="installButton" class="install-button hidden">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            <span>Install App</span>
+        </button>
+
+        <!-- Swipe Hint (shows on first visit) -->
+        <div id="swipeHint" class="swipe-hint">
+            <div class="swipe-hint-content">
+                <svg class="swipe-icon swipe-icon-left" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                </svg>
+                <span>Swipe to navigate</span>
+                <svg class="swipe-icon swipe-icon-right" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main JavaScript -->
+    <script src="/static/app.js"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker registered successfully:', registration.scope);
+                        console.log('Service Worker state:', registration.installing ? 'installing' : registration.waiting ? 'waiting' : registration.active ? 'active' : 'unknown');
+                    })
+                    .catch(error => {
+                        console.error('❌ Service Worker registration failed:', error);
+                    });
+            });
+        } else {
+            console.warn('⚠️ Service Worker not supported in this browser');
+        }
+
+        // Debug: Log PWA installation criteria
+        console.log('PWA Installation Debug Info:');
+        console.log('- HTTPS:', window.location.protocol === 'https:' || window.location.hostname === 'localhost');
+        console.log('- Service Worker Support:', 'serviceWorker' in navigator);
+        console.log('- Manifest Link:', document.querySelector('link[rel="manifest"]') ? 'Found' : 'Missing');
+        console.log('- User Agent:', navigator.userAgent);
+        console.log('- Display Mode:', window.matchMedia('(display-mode: standalone)').matches ? 'Standalone' : 'Browser');
+
+        // For iOS
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+            console.log('📱 iOS Device Detected');
+            console.log('- Standalone Mode:', window.navigator.standalone);
+            console.log('- Safari:', /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent));
+        }
+    </script>
+</body>
+</html>

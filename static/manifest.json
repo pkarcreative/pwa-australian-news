@@ -1,0 +1,64 @@
+{
+  "name": "Australian News & Reddit - AI Summaries",
+  "short_name": "AU News",
+  "description": "AI-powered Australian news and Reddit discussions with voice summaries",
+  "start_url": "/landing.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#121821",
+  "orientation": "portrait-primary",
+  "dir": "ltr",
+  "lang": "en-AU",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["news", "entertainment", "lifestyle"],
+  "screenshots": [],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "shortcuts": [
+    {
+      "name": "Latest News",
+      "short_name": "News",
+      "description": "View latest news",
+      "url": "/news",
+      "icons": [
+        {
+          "src": "/static/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Reddit Discussions",
+      "short_name": "Reddit",
+      "description": "View Reddit discussions",
+      "url": "/reddit",
+      "icons": [ { "src": "/static/icons/icon-192.png", "sizes": "192x192" } ]
+    }
+  ]
+}

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#121821">
+    <meta name="description" content="Australian news and discussions with AI summaries">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AU Insights">
+
+    <title>{% if content_type == 'reddit' %}Reddit Discussions{% else %}Australian News{% endif %}</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-512.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        .back-button {
+            position: fixed;
+            top: max(var(--safe-area-top), 16px);
+            left: max(var(--safe-area-left), 16px);
+            z-index: 1000;
+            background: rgba(26, 35, 50, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-gold);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-gold);
+            text-decoration: none;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .back-button:hover {
+            background: rgba(212, 175, 55, 0.2);
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Back Button -->
+    <a href="/" class="back-button" aria-label="Back to home">←</a>
+
+    <!-- App Container -->
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-title">
+                    <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        {% if content_type == 'reddit' %}
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+                        <circle cx="8.5" cy="10" r="1.5"/>
+                        <circle cx="15.5" cy="10" r="1.5"/>
+                        <path d="M8 15c.8 1.2 2.1 2 3.5 2s2.7-.8 3.5-2"/>
+                        {% else %}
+                        <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+                        {% endif %}
+                    </svg>
+                    <h1>{% if content_type == 'reddit' %}Reddit Discussions{% else %}Australian News{% endif %}</h1>
+                </div>
+                <div class="header-info">
+                    <span id="newsCount" class="news-counter">...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Loading Spinner -->
+        <div id="loading" class="loading">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p class="loading-text">Loading...</p>
+                <p class="loading-subtext">Please wait</p>
+            </div>
+        </div>
+
+        <!-- Cards Container -->
+        <div id="cardsContainer" class="cards-container">
+            <!-- Cards will be dynamically inserted here -->
+        </div>
+
+        <!-- Navigation Controls -->
+        <div class="navigation-controls">
+            <!-- Navigation Dots -->
+            <div id="navDots" class="nav-dots">
+                <!-- Dots will be dynamically inserted here -->
+            </div>
+
+            <!-- Swipe Navigation Arrows -->
+            <div class="swipe-arrows">
+                <button id="prevBtn" class="nav-arrow nav-arrow-left" aria-label="Previous">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                </button>
+                <button id="nextBtn" class="nav-arrow nav-arrow-right" aria-label="Next">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Swipe Hint -->
+        <div id="swipeHint" class="swipe-hint">
+            <div class="swipe-hint-content">
+                <svg class="swipe-icon swipe-icon-left" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                </svg>
+                <span>Swipe to navigate</span>
+                <svg class="swipe-icon swipe-icon-right" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Type (for JS) -->
+    <script>
+        window.CONTENT_TYPE = '{{ content_type }}';
+    </script>
+
+    <!-- Main JavaScript -->
+    <script>
+        // Main App Logic
+        let newsData = [];
+        let currentCardIndex = 0;
+        let touchStartX = 0;
+        let touchEndX = 0;
+        let isPlaying = false;
+        let currentAudio = null;
+
+        const contentType = window.CONTENT_TYPE || 'news';
+        const apiEndpoint = contentType === 'reddit' ? '/api/reddit' : '/api/news';
+
+        // DOM Elements
+        const cardsContainer = document.getElementById('cardsContainer');
+        const navDots = document.getElementById('navDots');
+        const loading = document.getElementById('loading');
+        const newsCount = document.getElementById('newsCount');
+        const swipeHint = document.getElementById('swipeHint');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        // Initialize App
+        async function initApp() {
+            try {
+                const response = await fetch(apiEndpoint);
+
+                if (response.status === 404) {
+                    const errorData = await response.json();
+                    loading.innerHTML = '<div class="loading-content">' +
+                        '<p class="loading-text">📭 No content available yet</p>' +
+                        '<p class="loading-subtext">Content is being fetched. Please refresh in a few minutes.</p>' +
+                        '</div>';
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch content');
+                }
+
+                newsData = await response.json();
+
+                if (newsData.error || !Array.isArray(newsData) || newsData.length === 0) {
+                    loading.innerHTML = '<div class="loading-content">' +
+                        '<p class="loading-text">No content available</p>' +
+                        '<p class="loading-subtext">Please try again later</p>' +
+                        '</div>';
+                    return;
+                }
+
+                loading.classList.add('hidden');
+                renderCards();
+                renderNavDots();
+                updateNewsCount();
+                showSwipeHint();
+                setupEventListeners();
+
+            } catch (error) {
+                console.error('Error loading content:', error);
+                loading.innerHTML = '<div class="loading-content">' +
+                    '<p class="loading-text">Error loading content</p>' +
+                    '<p class="loading-subtext">' + error.message + '</p>' +
+                    '</div>';
+            }
+        }
+
+        // Render News Cards
+        function renderCards() {
+            cardsContainer.innerHTML = '';
+
+            newsData.forEach((news, index) => {
+                const card = document.createElement('div');
+                card.className = `news-card ${index === 0 ? 'active' : ''}`;
+                card.dataset.index = index;
+
+                card.innerHTML = `
+                    <div class="card-image-container">
+                        <img src="${news.image}"
+                             alt="${news.title}"
+                             class="card-image ${isPlaying ? 'animating' : ''}"
+                             onerror="this.src='https://via.placeholder.com/400x250/4A90E2/ffffff?text=No+Image'">
+
+                        <div class="play-button-overlay" data-card-index="${index}">
+                            <button class="play-pause-btn" data-card-index="${index}">
+                                ${isPlaying ? '⏸' : '▶'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-content">
+                        <span class="card-category">${news.category || ''}</span>
+                        <h2 class="card-title">${news.title}</h2>
+                        <p class="card-summary">${news.summary}</p>
+                        <div class="card-footer">
+                            <span class="card-source">${news.source || ''}</span>
+                            <a href="${news.source_url}" target="_blank" class="read-more-btn">
+                                Read Full →
+                            </a>
+                        </div>
+                    </div>
+                `;
+
+                cardsContainer.appendChild(card);
+            });
+
+            setupPlayButtonHandlers();
+        }
+
+        function setupPlayButtonHandlers() {
+            const playButtons = document.querySelectorAll('.play-button-overlay');
+            playButtons.forEach(overlay => {
+                overlay.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    togglePlayPause();
+                });
+            });
+        }
+
+        function togglePlayPause() {
+            isPlaying = !isPlaying;
+            updateAllPlayButtons();
+            updateCurrentCardAnimation();
+
+            if (isPlaying) {
+                startTTS(currentCardIndex);
+            } else {
+                pauseTTS();
+            }
+        }
+
+        async function startTTS(cardIndex) {
+            try {
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
+                }
+
+                const news = newsData[cardIndex];
+
+                if (!news.tts_url) {
+                    console.error('No TTS URL available');
+                    isPlaying = false;
+                    updateAllPlayButtons();
+                    updateCurrentCardAnimation();
+                    return;
+                }
+
+                currentAudio = new Audio(news.tts_url);
+
+                currentAudio.addEventListener('ended', () => {
+                    isPlaying = false;
+                    updateAllPlayButtons();
+                    updateCurrentCardAnimation();
+
+                    if (currentCardIndex < newsData.length - 1) {
+                        setTimeout(() => {
+                            nextCard();
+                            isPlaying = true;
+                            updateAllPlayButtons();
+                            updateCurrentCardAnimation();
+                            startTTS(currentCardIndex);
+                        }, 500);
+                    }
+                });
+
+                currentAudio.addEventListener('error', (e) => {
+                    console.error('Audio playback error:', e);
+                    isPlaying = false;
+                    updateAllPlayButtons();
+                    updateCurrentCardAnimation();
+                });
+
+                await currentAudio.play();
+
+            } catch (error) {
+                console.error('Error starting TTS:', error);
+                isPlaying = false;
+                updateAllPlayButtons();
+                updateCurrentCardAnimation();
+            }
+        }
+
+        function pauseTTS() {
+            if (currentAudio) {
+                currentAudio.pause();
+            }
+        }
+
+        function updateAllPlayButtons() {
+            const playButtons = document.querySelectorAll('.play-pause-btn');
+            playButtons.forEach(btn => {
+                btn.textContent = isPlaying ? '⏸' : '▶';
+            });
+        }
+
+        function updateCurrentCardAnimation() {
+            const cards = document.querySelectorAll('.news-card');
+            const currentCard = cards[currentCardIndex];
+
+            if (currentCard) {
+                const image = currentCard.querySelector('.card-image');
+                if (isPlaying) {
+                    image.classList.add('animating');
+                } else {
+                    image.classList.remove('animating');
+                }
+            }
+        }
+
+        function renderNavDots() {
+            navDots.innerHTML = '';
+            newsData.forEach((_, index) => {
+                const dot = document.createElement('div');
+                dot.className = `dot ${index === 0 ? 'active' : ''}`;
+                dot.dataset.index = index;
+                dot.addEventListener('click', () => goToCard(index));
+                navDots.appendChild(dot);
+            });
+        }
+
+        function showSwipeHint() {
+            const hasSeenHint = localStorage.getItem('hasSeenSwipeHint');
+            if (!hasSeenHint) {
+                setTimeout(() => {
+                    swipeHint.classList.add('hidden');
+                    localStorage.setItem('hasSeenSwipeHint', 'true');
+                }, 3000);
+            } else {
+                swipeHint.classList.add('hidden');
+            }
+        }
+
+        function goToCard(index) {
+            if (index < 0 || index >= newsData.length) return;
+
+            const cards = document.querySelectorAll('.news-card');
+            const dots = document.querySelectorAll('.dot');
+
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+
+            isPlaying = false;
+            updateAllPlayButtons();
+
+            cards.forEach((card, i) => {
+                card.classList.remove('active', 'prev', 'next');
+                const image = card.querySelector('.card-image');
+                image.classList.remove('animating');
+
+                if (i === index) {
+                    card.classList.add('active');
+                } else if (i < index) {
+                    card.classList.add('prev');
+                } else {
+                    card.classList.add('next');
+                }
+            });
+
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+
+            currentCardIndex = index;
+            updateNewsCount();
+        }
+
+        function nextCard() {
+            if (currentCardIndex < newsData.length - 1) {
+                goToCard(currentCardIndex + 1);
+            }
+        }
+
+        function prevCard() {
+            if (currentCardIndex > 0) {
+                goToCard(currentCardIndex - 1);
+            }
+        }
+
+        function setupEventListeners() {
+            cardsContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+            cardsContainer.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') prevCard();
+                if (e.key === 'ArrowRight') nextCard();
+                if (e.key === ' ' || e.key === 'Spacebar') {
+                    e.preventDefault();
+                    togglePlayPause();
+                }
+            });
+
+            if (prevBtn) {
+                prevBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    prevCard();
+                });
+            }
+
+            if (nextBtn) {
+                nextBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    nextCard();
+                });
+            }
+        }
+
+        function handleTouchStart(e) {
+            touchStartX = e.touches[0].clientX;
+        }
+
+        function handleTouchEnd(e) {
+            touchEndX = e.changedTouches[0].clientX;
+            handleSwipe();
+        }
+
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const difference = touchStartX - touchEndX;
+
+            if (Math.abs(difference) > swipeThreshold) {
+                if (difference > 0) {
+                    nextCard();
+                } else {
+                    prevCard();
+                }
+            }
+        }
+
+        function updateArrowStates() {
+            if (prevBtn && nextBtn) {
+                prevBtn.disabled = currentCardIndex === 0;
+                nextBtn.disabled = currentCardIndex === newsData.length - 1;
+            }
+        }
+
+        function updateNewsCount() {
+            newsCount.textContent = `${currentCardIndex + 1} / ${newsData.length}`;
+            updateArrowStates();
+        }
+
+        // Initialize app when DOM is ready
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('❌ Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>

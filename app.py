@@ -490,8 +490,8 @@ def fetch_australian_news():
     
     # Use timezone-aware datetime
     now = datetime.now(timezone.utc)
-    past_24h = now - timedelta(hours=24)
-    startdatetime = past_24h.strftime("%Y%m%d%H%M%S")
+    past_10h = now - timedelta(hours=10)
+    startdatetime = past_10h.strftime("%Y%m%d%H%M%S")
     enddatetime = now.strftime("%Y%m%d%H%M%S")
     
     list_countries = ['AS']  # Australia (AS in FIPS/GDELT, not AU which is Austria!)

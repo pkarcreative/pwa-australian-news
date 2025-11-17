@@ -1,25 +1,27 @@
-# বাংলা খবর - Bengali News PWA
+# Australian News PWA
 
-A Progressive Web App (PWA) for Bengali news with AI-powered summaries and text-to-speech playback.
+A Progressive Web App (PWA) for Australian news with AI-powered summaries, Reddit discussions, and text-to-speech playback.
 
 ## Features
 
-- **AI-Powered Summaries**: GPT-4o-mini generates concise 60-word Bengali summaries
-- **Text-to-Speech**: Listen to news articles with OpenAI's gpt-4o-mini-tts
+- **Dual Content Sources**: GDELT news articles + Reddit discussions from Australian subreddits
+- **AI-Powered Summaries**: Google Gemini generates concise 60-word summaries with Australian relevance filtering
+- **Intelligent Filtering**: 3-step LLM validation (paywall detection → AU relevance → content verification)
+- **Text-to-Speech**: High-quality audio narration using Google Gemini TTS API (WAV format, 24kHz)
 - **Cloud Storage**: TTS audio files stored in pCloud for scalability
 - **Progressive Web App**: Install on iOS, Android, and Desktop
 - **Offline Support**: Service worker caching for offline access
-- **Luxurious Design**: Gold & navy color theme with smooth animations
 - **Mobile-Optimized**: Card-based interface with swipe navigation
 - **Auto-Play**: Automatically advances to next article after audio ends
-- **Cron-Ready**: Separate endpoint for scheduled news updates
 
 ## Tech Stack
 
 - **Backend**: Flask (Python)
-- **AI**: OpenAI API (GPT-4o-mini for summaries, gpt-4o-mini-tts for audio)
+- **AI**: Google Gemini 2.5 Flash (summaries + TTS)
 - **Storage**: pCloud API for TTS audio files
-- **Data Source**: GDELT API for Bengali news
+- **Data Sources**:
+  - GDELT API for Australian news articles
+  - Reddit API (PRAW) for r/australia, r/AustralianPolitics, r/sydney, r/melbourne
 - **Frontend**: Vanilla JavaScript, CSS with modern animations
 - **PWA**: Service Workers, Web App Manifest
 
@@ -28,7 +30,7 @@ A Progressive Web App (PWA) for Bengali news with AI-powered summaries and text-
 ### 1. Clone Repository
 ```bash
 git clone https://github.com/pkarcreative/pwa-news-app.git
-cd pwa-news-app
+cd news-cards-pwa-Australia
 ```
 
 ### 2. Install Dependencies
@@ -37,14 +39,20 @@ pip install -r requirements.txt
 ```
 
 ### 3. Configure Environment
-Create a `.env` file in the root directory (copy from `.env.example`):
+Create a `.env` file in the root directory:
 ```env
-OPENAI_API_KEY=your_openai_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 PCLOUD_USERNAME=your_pcloud_email@example.com
 PCLOUD_PASSWORD=your_pcloud_password_here
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+REDDIT_USER_AGENT=AustralianNewsBot/1.0
 ```
 
-**Note**: Create a free pCloud account at https://www.pcloud.com and use your credentials above.
+**Getting API Keys**:
+- **Gemini API**: Get free API key at https://aistudio.google.com/app/apikey
+- **pCloud**: Create free account at https://www.pcloud.com (10GB free storage)
+- **Reddit API**: Create app at https://www.reddit.com/prefs/apps (choose "script" type)
 
 ### 4. Run Application
 ```bash
@@ -56,7 +64,7 @@ Access at: `http://localhost:5000`
 ### 5. Initial News Fetch
 After starting the app, fetch news for the first time:
 ```bash
-curl -X POST http://localhost:5000/api/fetch-news
+curl http://localhost:5000/api/fetch-news
 ```
 
 Or visit in browser: `http://localhost:5000/api/fetch-news`
@@ -71,27 +79,30 @@ Or visit in browser: `http://localhost:5000/api/fetch-news`
 
 **Start Command** (set in Render dashboard):
 ```bash
-gunicorn --config gunicorn.conf.py app:app
+gunicorn --bind 0.0.0.0:$PORT --timeout 600 app:app
 ```
-
-Note: The config file automatically detects Render's `$PORT` environment variable.
 
 **Environment Variables** (set in Render dashboard):
 ```
-OPENAI_API_KEY=your_key_here
+GEMINI_API_KEY=your_key_here
 PCLOUD_USERNAME=your_email
 PCLOUD_PASSWORD=your_password
+REDDIT_CLIENT_ID=your_id
+REDDIT_CLIENT_SECRET=your_secret
+REDDIT_USER_AGENT=AustralianNewsBot/1.0
 ```
 
-**Important**: The `gunicorn.conf.py` file sets a 10-minute timeout for `/api/fetch-news` endpoint.
+**Important**: The 600s timeout allows `/api/fetch-news` endpoint to complete TTS generation.
 
-See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for detailed deployment instructions including:
-- Removing testing limitations
-- HTTPS setup options
-- Icon requirements
-- Performance optimization
-- Cost estimation
-- Security considerations
+### Memory Optimization
+
+The app includes memory constraints for free hosting:
+- **News**: Currently processes all articles (can be limited in code line 625-627)
+- **Reddit**: Limited to 15 discussions (line 756-758)
+
+To adjust limits for production with more memory:
+1. Uncomment and modify news limit in `app.py` lines 625-627
+2. Increase Reddit limit in `app.py` line 758
 
 ## PWA Installation
 
@@ -105,73 +116,69 @@ See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for detailed deployment instructi
 1. Look for "Install App" button
 2. Click and confirm installation
 
-For troubleshooting, see [PWA_INSTALL_DEBUG.md](PWA_INSTALL_DEBUG.md)
-
-## Testing Mode
-
-Currently limited to 3 news articles to reduce API costs and fit Render's memory constraints.
-
-**Location**: [app.py:387-390](app.py#L387-L390)
-
-To increase for production:
-1. Upgrade Render plan for more memory
-2. Or optimize TTS generation further
-3. Update the limit in code
-
 ## Cost Estimation
 
-### OpenAI API Costs
+### Google Gemini API Costs
 
-#### Current (3 articles on Render free tier)
-- ~$0.01-0.02 per fetch
-- Monthly (4x daily): ~$1.20-2.40
+Gemini 2.5 Flash has a generous free tier:
+- **Free quota**: 1,500 requests/day
+- **Lite model**: Used for summaries (cheaper)
+- **TTS model**: Used for audio generation
 
-#### Production (50 articles with upgraded hosting)
-- ~$0.20-$0.30 per fetch
-- Monthly cost (4x daily): ~$24-36
+#### Current Usage (10 articles + 15 Reddit posts per fetch)
+- Summarization: ~25 LLM calls
+- TTS generation: ~25 audio files
+- **Cost per fetch**: ~$0.01-0.03 (if exceeding free tier)
+- **Monthly (4x daily)**: ~$1.20-3.60
 
 ### pCloud Storage
 - **Free tier**: 10GB (sufficient for thousands of TTS files)
-- Each TTS file: ~50-100KB
-- 50 articles = ~2.5-5MB per batch
+- Each TTS file: ~50-150KB (WAV format)
+- 25 articles = ~1.25-3.75MB per batch
 
-**Total Monthly Cost (Production)**: $24-36 (OpenAI only, pCloud free tier)
+**Total Monthly Cost (Production)**: $1-4 (Gemini only, pCloud free tier)
 
 ## Project Structure
 
 ```
 .
-├── app.py                  # Flask backend
+├── app.py                  # Flask backend with news + Reddit fetching
 ├── requirements.txt        # Python dependencies
 ├── .env                    # Environment variables (not in repo)
+├── .env.example           # Environment variables template
 ├── templates/
-│   └── index.html         # Main HTML template
+│   ├── landing.html       # Landing page (news/reddit selection)
+│   ├── index.html         # News viewer
+│   └── viewer.html        # Reddit discussions viewer
 ├── static/
-│   ├── app.js             # Frontend JavaScript
-│   ├── style.css          # Luxurious UI styles
+│   ├── style.css          # UI styles
 │   ├── sw.js              # Service worker
 │   ├── manifest.json      # PWA manifest
-│   └── icons/             # App icons
-├── random testing/        # Development testing files
-└── .env.example           # Environment variables template
-
+│   ├── icons/             # App icons
+│   └── tts_audio/         # Temporary TTS storage (deleted after upload)
+└── app_backup.py          # Backup of previous version
 ```
 
 ## API Endpoints
 
 ### User-Facing Endpoints
-- `GET /` - Main app interface
+- `GET /` - Landing page (select News or Reddit)
+- `GET /news` - News articles viewer
+- `GET /reddit` - Reddit discussions viewer
 - `GET /api/news` - Get cached news data (returns 404 if no cache)
+- `GET /api/reddit` - Get cached Reddit discussions (returns 404 if no cache)
 - `GET /api/tts/<id>` - Stream TTS audio for specific news article
-- `GET /api/status` - Check cache status and info
-- `GET /api/stats` - View visitor statistics by country
+- `GET /api/reddit-tts/<id>` - Stream TTS audio for specific Reddit discussion
 
-### Cron/Admin Endpoints
-- `POST /api/fetch-news` - **Fetch fresh news, generate summaries & TTS, upload to pCloud**
-  - This is the ONLY endpoint that fetches new news
+### Admin Endpoints
+- `GET /api/fetch-news` - **Fetch fresh news, generate summaries & TTS, upload to pCloud**
   - Takes 2-5 minutes to complete
   - Deletes old pCloud TTS files before generating new ones
-  - Should be called via external cron service (e.g., cron-job.org, EasyCron)
+  - Should be called via external cron service (e.g., cron-job.org)
+
+- `GET /api/fetch-reddit` - **Fetch Reddit discussions, generate summaries & TTS**
+  - Similar to fetch-news but for Reddit content
+  - Fetches from r/australia, r/AustralianPolitics, r/sydney, r/melbourne
 
 ### TTS Architecture Flow
 
@@ -179,13 +186,17 @@ To increase for production:
 ┌─────────────────────────────────────────────────────────────┐
 │ STEP 1: /api/fetch-news (Cron Job - Every 6 Hours)         │
 ├─────────────────────────────────────────────────────────────┤
-│ 1. Fetch Bengali news from GDELT API                       │
-│ 2. Generate AI summaries (GPT-4o-mini)                     │
-│ 3. Generate TTS audio (OpenAI TTS)                         │
-│ 4. Upload to pCloud storage                                │
-│ 5. Create permanent public link: getfilepublink()          │
-│    → Returns: CODE (e.g., "XkZy7ABC...") ✓ Never expires!  │
-│ 6. Cache CODE in DataFrame['tts_code']                     │
+│ 1. Fetch Australian news from GDELT API                    │
+│ 2. Scrape full article text + titles                       │
+│ 3. Generate AI summaries (Gemini 2.5 Flash Lite)          │
+│    - Check Australian relevance                            │
+│    - Detect paywalls                                       │
+│    - Generate 60-word summary                              │
+│ 4. Generate TTS audio (Gemini 2.5 TTS)                    │
+│ 5. Upload WAV files to pCloud storage                     │
+│ 6. Create permanent public link: getfilepublink()         │
+│    → Returns: CODE (e.g., "XkZy7ABC...") ✓ Never expires! │
+│ 7. Cache CODE in DataFrame['tts_code']                    │
 └─────────────────────────────────────────────────────────────┘
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -200,10 +211,10 @@ To increase for production:
 │ STEP 3: User Clicks Play Button                            │
 ├─────────────────────────────────────────────────────────────┤
 │ Frontend: GET /api/tts/1 (our server)                      │
-│ Backend:  1. Read CODE from DataFrame                      │
-│           2. Call getpublinkdownload(CODE)                  │
-│           3. Get fresh download URL from pCloud             │
-│           4. Stream audio → Frontend                        │
+│ Backend:  1. Read CODE from cached DataFrame               │
+│           2. Call getpublinkdownload(CODE)                 │
+│           3. Get fresh download URL from pCloud            │
+│           4. Stream WAV audio → Frontend                   │
 └─────────────────────────────────────────────────────────────┘
 
 Benefits:
@@ -211,24 +222,36 @@ Benefits:
 ✅ Fresh download URLs generated on-demand
 ✅ No CORS issues (same-origin requests)
 ✅ Works on all devices (iPhone, Android, Desktop)
-✅ Server-side streaming (efficient, cacheable)
+✅ High-quality 24kHz WAV audio
 ```
 
 ### Recommended Cron Schedule
 ```bash
 # Update news every 6 hours
-0 */6 * * * curl -X POST https://your-domain.com/api/fetch-news
+0 */6 * * * curl https://your-domain.com/api/fetch-news
+
+# Update Reddit discussions every 6 hours (offset by 3 hours)
+0 3,9,15,21 * * * curl https://your-domain.com/api/fetch-reddit
 
 # Or use a web-based cron service:
 # - URL: https://your-domain.com/api/fetch-news
-# - Method: POST
+# - Method: GET
 # - Interval: Every 6 hours
 ```
 
-## Features in Detail
+## Key Features in Detail
 
-### Ken Burns Effect
-Images in news cards have dynamic panning/zooming animation when audio is playing.
+### 3-Step LLM Filtering
+Each article passes through intelligent validation:
+1. **Paywall Detection**: Filters articles behind paywalls
+2. **Australian Relevance**: Ensures content is relevant to Australia (politics, economy, business, culture, sports, or international with AU angle)
+3. **Content Verification**: Validates summary contains actual news facts (names, events, places, numbers)
+
+### Reddit Integration
+- Fetches discussions from 4 Australian subreddits
+- Includes top 5 comments with each post
+- Ranks by upvotes (score) and engagement
+- Generates combined summaries of post + comments
 
 ### Auto-Advance
 When TTS finishes, automatically moves to next card and starts playing.
@@ -250,6 +273,24 @@ When TTS finishes, automatically moves to next card and starts playing.
 - Desktop Chrome 67+
 - Desktop Edge 79+
 
+## Troubleshooting
+
+### News cards show "Title not available"
+- Ensure you've run `/api/fetch-news` at least once
+- Check that articles passed the 3-step LLM filter
+- Verify GDELT API is returning results for Australia
+
+### TTS audio not playing
+- Check that pCloud credentials are correct in `.env`
+- Ensure pCloud has available storage space
+- Verify TTS files were uploaded (check Flask logs)
+- Try refreshing the cache with a new `/api/fetch-news` call
+
+### "No news available" error
+- Run `/api/fetch-news` to populate the cache
+- Check Flask logs for API errors (Gemini quota, GDELT issues)
+- Verify all environment variables are set correctly
+
 ## License
 
 MIT License
@@ -264,4 +305,4 @@ For issues and feature requests, please open an issue on GitHub.
 
 ---
 
-**Last Updated**: 2025-10-18
+**Last Updated**: 2025-11-17

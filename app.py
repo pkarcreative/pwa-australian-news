@@ -486,7 +486,7 @@ def fetch_australian_news():
     mode_type = "ArtList"
     sort_type = "DateDesc"
     language = "eng"  # English
-    maxrecords = 10
+    maxrecords = 20
     
     # Use timezone-aware datetime
     now = datetime.now(timezone.utc)

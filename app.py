@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, send_from_directory, request, send_file, Response, redirect
+from flask import Flask, render_template, jsonify, send_from_directory, request, send_file, Response
 import os
 import io
 import urllib.request
@@ -1141,26 +1141,118 @@ def get_stats():
         })
 
 @app.route('/api/tts/<int:news_id>')
-@app.route('/api/tts/<int:news_id>')
 def stream_tts(news_id):
-    """Redirect to pCloud to support iOS Safari/Chrome Range Requests for WAV files"""
-    
-    # 1. Check Data
+    """Stream TTS audio from pCloud using permanent public link code"""
+
+    print(f"\n/api/tts/{news_id} called")
+
+    # Check if news data exists
     if NEWS_CACHE['data'] is None or NEWS_CACHE['data'].empty:
-        return jsonify({'error': 'No data'}), 404
-        
+        return jsonify({
+            'error': 'No news data available',
+            'message': 'Please fetch news first via /api/fetch-news'
+        }), 404
+
+    # Validate news_id
     if news_id < 1 or news_id > len(NEWS_CACHE['data']):
-        return jsonify({'error': 'Invalid ID'}), 400
+        return jsonify({
+            'error': 'Invalid news ID',
+            'message': f'News ID must be between 1 and {len(NEWS_CACHE["data"])}'
+        }), 400
 
     try:
-        # 2. Get the pCloud code
+        # Get the pCloud link code from DataFrame
         idx = news_id - 1
         tts_code = NEWS_CACHE['data'].iloc[idx].get('tts_code')
 
         if not tts_code or pd.isna(tts_code):
-            return jsonify({'error': 'No TTS available'}), 404
+            return jsonify({
+                'error': 'No TTS available',
+                'message': f'TTS for news {news_id} not available'
+            }), 404
 
-        # 3. Get the direct download URL from pCloud
+        # Get download URL from pCloud using the permanent link code
+        api_url = "https://api.pcloud.com/getpublinkdownload"
+        params = {
+            'code': tts_code,
+            'forcedownload': 0  # Stream, don't force download
+        }
+
+        response = requests.get(api_url, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('result') == 0:
+                # Get download URL from response
+                download_url = f"https://{data['hosts'][0]}{data['path']}"
+
+                # Stream from pCloud to client
+                print(f"Streaming from pCloud: news_{news_id}.wav")
+                pcloud_response = requests.get(download_url, stream=True)
+
+                # Return streaming response
+                def generate():
+                    for chunk in pcloud_response.iter_content(chunk_size=8192):
+                        yield chunk
+
+                return Response(
+                    generate(),
+                    mimetype='audio/wav',
+                    headers={
+                        'Content-Type': 'audio/wav',
+                        'Accept-Ranges': 'bytes',
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                )
+            else:
+                print(f"pCloud API error: {data.get('error')}")
+                return jsonify({
+                    'error': 'pCloud error',
+                    'message': data.get('error')
+                }), 500
+        else:
+            return jsonify({
+                'error': 'Failed to get download link',
+                'message': 'pCloud API error'
+            }), 500
+
+    except Exception as e:
+        print(f"Error in /api/tts/{news_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/tts-reddit/<int:reddit_id>')
+def stream_tts_reddit(reddit_id):
+    """Stream Reddit TTS audio from pCloud"""
+    print(f"\n/api/tts-reddit/{reddit_id} called")
+
+    if REDDIT_CACHE['data'] is None or REDDIT_CACHE['data'].empty:
+        return jsonify({
+            'error': 'No Reddit data available',
+            'message': 'Please fetch Reddit first via /api/fetch-reddit'
+        }), 404
+
+    if reddit_id < 1 or reddit_id > len(REDDIT_CACHE['data']):
+        return jsonify({
+            'error': 'Invalid Reddit ID',
+            'message': f'Reddit ID must be between 1 and {len(REDDIT_CACHE["data"])}'
+        }), 400
+
+    try:
+        idx = reddit_id - 1
+        tts_code = REDDIT_CACHE['data'].iloc[idx].get('tts_code')
+
+        if not tts_code or pd.isna(tts_code):
+            return jsonify({
+                'error': 'No TTS available',
+                'message': f'TTS for Reddit discussion {reddit_id} not available'
+            }), 404
+
         api_url = "https://api.pcloud.com/getpublinkdownload"
         params = {
             'code': tts_code,
@@ -1172,49 +1264,31 @@ def stream_tts(news_id):
             data = response.json()
             if data.get('result') == 0:
                 download_url = f"https://{data['hosts'][0]}{data['path']}"
+                print(f"Streaming from pCloud: reddit_{reddit_id}.wav")
+                pcloud_response = requests.get(download_url, stream=True)
 
-                # --- THE FIX ---
-                # Do not stream through Flask. Redirect to pCloud.
-                # pCloud supports the "Range" headers required by iPhone.
-                return redirect(download_url)
-                # ---------------
+                def generate():
+                    for chunk in pcloud_response.iter_content(chunk_size=8192):
+                        yield chunk
 
-    except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({'error': str(e)}), 500
-    
-    return jsonify({'error': 'Unknown error'}), 500
-
-@app.route('/api/tts-reddit/<int:reddit_id>')
-@app.route('/api/tts-reddit/<int:reddit_id>')
-def stream_tts_reddit(reddit_id):
-    if REDDIT_CACHE['data'] is None or REDDIT_CACHE['data'].empty:
-        return jsonify({'error': 'No data'}), 404
-
-    try:
-        idx = reddit_id - 1
-        tts_code = REDDIT_CACHE['data'].iloc[idx].get('tts_code')
-
-        if not tts_code or pd.isna(tts_code):
-            return jsonify({'error': 'No TTS'}), 404
-
-        api_url = "https://api.pcloud.com/getpublinkdownload"
-        params = {'code': tts_code, 'forcedownload': 0}
-
-        response = requests.get(api_url, params=params)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('result') == 0:
-                download_url = f"https://{data['hosts'][0]}{data['path']}"
-                
-                # THE FIX: Redirect instead of stream
-                return redirect(download_url)
+                return Response(
+                    generate(),
+                    mimetype='audio/wav',
+                    headers={
+                        'Content-Type': 'audio/wav',
+                        'Accept-Ranges': 'bytes',
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                )
 
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({'error': str(e)}), 500
-    
-    return jsonify({'error': 'Unknown error'}), 500
+        print(f"Error in /api/tts-reddit/{reddit_id}: {str(e)}")
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e)
+        }), 500
 
 
 if __name__ == '__main__':

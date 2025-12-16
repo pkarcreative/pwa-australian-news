@@ -8,7 +8,10 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from openai import OpenAI
+import google.generativeai as genai
+from google import genai as genai_new
+from google.genai import types
+import wave
 import praw
 import time
 import threading
@@ -44,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 reddit_client_id = os.getenv("REDDIT_CLIENT_ID")
 reddit_client_secret = os.getenv("REDDIT_CLIENT_SECRET")
 reddit_user_agent = os.getenv("REDDIT_USER_AGENT")
@@ -56,8 +59,8 @@ headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 }
 
-# Initialize OpenAI
-client = OpenAI(api_key=openai_api_key)
+# Initialize Gemini
+genai.configure(api_key=gemini_api_key)
 
 # Initialize Reddit
 reddit = praw.Reddit(
@@ -160,7 +163,7 @@ def get_news_text_and_titles(url):
         return None, None
 
 def summarize_english(text, max_tokens=500):
-    """SINGLE LLM call: AU relevance check → Generate summary → Validate summary for paywall using OpenAI gpt-5-nano"""
+    """SINGLE LLM call: AU relevance check → Generate summary → Validate summary for paywall"""
     max_retries = 3
     text_truncated = text[:8000]
 
@@ -187,14 +190,9 @@ Text:
 
 Response:"""
 
-            response = client.chat.completions.create(
-                model="gpt-5-nano",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
-                temperature=0.3
-            )
-            
-            result = response.choices[0].message.content.strip()
+            model = genai.GenerativeModel('gemini-2.5-flash-lite')
+            response = model.generate_content(prompt)
+            result = response.text.strip()
 
             # Filter based on LLM response
             if "NOT_RELEVANT" in result:
@@ -209,7 +207,7 @@ Response:"""
             return result
 
         except Exception as e:
-            if "429" in str(e) or "quota" in str(e).lower() or "rate" in str(e).lower():
+            if "429" in str(e) or "quota" in str(e).lower():
                 wait_time = (attempt + 1) * 5
                 print(f"Rate limit hit, waiting {wait_time}s... (attempt {attempt+1}/{max_retries})")
                 time.sleep(wait_time)
@@ -318,14 +316,13 @@ def upload_to_pcloud(local_filepath, pcloud_filename, folder):
         return False
 
 def generate_and_upload_tts(text, news_id, folder, prefix="news", max_retries=2):
-    """Generate TTS ONE AT A TIME using OpenAI tts-1, upload to pCloud, delete immediately, free memory"""
+    """Generate TTS ONE AT A TIME, upload to pCloud, delete immediately, free memory"""
     audio_filepath = None
 
     for attempt in range(max_retries):
-        response = None  # Track response object for cleanup
         try:
-            # Define file paths (MP3 format for OpenAI TTS)
-            audio_filename = f"{prefix}_{news_id}.mp3"
+            # Define file paths (WAV format for Gemini TTS)
+            audio_filename = f"{prefix}_{news_id}.wav"
             audio_filepath = os.path.join(TTS_AUDIO_DIR, audio_filename)
 
             if attempt == 0:
@@ -333,18 +330,33 @@ def generate_and_upload_tts(text, news_id, folder, prefix="news", max_retries=2)
             else:
                 print(f"\n   [{news_id}] Retry {attempt}...", end=' ', flush=True)
 
-            # Generate speech using OpenAI TTS API (tts-1 model - cheapest)
-            response = client.audio.speech.create(
-                model="tts-1",
-                voice="alloy",
-                input=text,
-                timeout=60  # 60 second timeout
+            # Generate speech using Gemini TTS API (new SDK)
+            client = genai_new.Client(api_key=gemini_api_key)
+            response = client.models.generate_content(
+                model='gemini-2.5-flash-preview-tts',
+                contents=text,
+                config=types.GenerateContentConfig(
+                    response_modalities=["AUDIO"],
+                    speech_config=types.SpeechConfig(
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                voice_name='Puck'  # Upbeat, clear voice
+                            )
+                        )
+                    )
+                )
             )
 
-            # Save to local file temporarily
-            response.stream_to_file(audio_filepath)
-            del response  # Free response object immediately
-            response = None
+            # Extract PCM audio data (already raw bytes, not base64)
+            pcm_data = response.candidates[0].content.parts[0].inline_data.data
+
+            # Write WAV file with proper headers
+            with wave.open(audio_filepath, 'wb') as wav_file:
+                wav_file.setnchannels(1)       # mono
+                wav_file.setsampwidth(2)        # 16-bit = 2 bytes
+                wav_file.setframerate(24000)    # 24kHz
+                wav_file.writeframes(pcm_data)
+
             print(f"Saved", flush=True)
 
             # Upload to pCloud immediately
@@ -375,11 +387,6 @@ def generate_and_upload_tts(text, news_id, folder, prefix="news", max_retries=2)
 
         except Exception as e:
             print(f"Error: {str(e)[:100]}")
-
-            # Clean up response object
-            if response is not None:
-                del response
-                response = None
 
             # Clean up local file on error
             if audio_filepath and os.path.exists(audio_filepath):
@@ -435,7 +442,7 @@ def generate_all_tts(df_news, folder, prefix="news"):
             print(f"Done", flush=True)
 
             # Get and cache pCloud public link code after indexing delay
-            audio_filename = f"{prefix}_{news_id}.mp3"
+            audio_filename = f"{prefix}_{news_id}.wav"
             print(f"   [{news_id}] Getting pCloud public link code...", end=' ', flush=True)
             link_code = get_pcloud_public_code(audio_filename, folder)
 
@@ -764,7 +771,7 @@ def fetch_reddit_discussions():
             for i, comment in enumerate(row['top_comments'][:3], 1):
                 combined_text += f"{i}. {comment['body']}\n"
 
-        # Summarize with retry logic using OpenAI gpt-5-nano
+        # Summarize with retry logic
         prompt = f"""Summarize this Reddit discussion including the main post and key points from top comments. Keep it concise (60 words max):
 
 {combined_text}"""
@@ -773,18 +780,14 @@ def fetch_reddit_discussions():
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = client.chat.completions.create(
-                    model="gpt-5-nano",
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=200,
-                    temperature=0.3
-                )
-                summary = response.choices[0].message.content.strip()
+                model = genai.GenerativeModel('gemini-2.5-flash-lite')
+                response = model.generate_content(prompt)
+                summary = response.text.strip()
                 summaries.append(summary)
                 print("Done")
                 break
             except Exception as e:
-                if "429" in str(e) or "quota" in str(e).lower() or "rate" in str(e).lower():
+                if "429" in str(e) or "quota" in str(e).lower():
                     wait_time = (attempt + 1) * 5
                     print(f"Rate limit, waiting {wait_time}s...")
                     time.sleep(wait_time)
@@ -1183,7 +1186,7 @@ def stream_tts(news_id):
                 download_url = f"https://{data['hosts'][0]}{data['path']}"
 
                 # Stream from pCloud to client
-                print(f"Streaming from pCloud: news_{news_id}.mp3")
+                print(f"Streaming from pCloud: news_{news_id}.wav")
                 pcloud_response = requests.get(download_url, stream=True)
 
                 # Return streaming response
@@ -1193,9 +1196,9 @@ def stream_tts(news_id):
 
                 return Response(
                     generate(),
-                    mimetype='audio/mpeg',
+                    mimetype='audio/wav',
                     headers={
-                        'Content-Type': 'audio/mpeg',
+                        'Content-Type': 'audio/wav',
                         'Accept-Ranges': 'bytes',
                         'Cache-Control': 'no-cache',
                         'Pragma': 'no-cache',
@@ -1261,7 +1264,7 @@ def stream_tts_reddit(reddit_id):
             data = response.json()
             if data.get('result') == 0:
                 download_url = f"https://{data['hosts'][0]}{data['path']}"
-                print(f"Streaming from pCloud: reddit_{reddit_id}.mp3")
+                print(f"Streaming from pCloud: reddit_{reddit_id}.wav")
                 pcloud_response = requests.get(download_url, stream=True)
 
                 def generate():
@@ -1270,9 +1273,9 @@ def stream_tts_reddit(reddit_id):
 
                 return Response(
                     generate(),
-                    mimetype='audio/mpeg',
+                    mimetype='audio/wav',
                     headers={
-                        'Content-Type': 'audio/mpeg',
+                        'Content-Type': 'audio/wav',
                         'Accept-Ranges': 'bytes',
                         'Cache-Control': 'no-cache',
                         'Pragma': 'no-cache',
@@ -1294,7 +1297,7 @@ if __name__ == '__main__':
     print("="*70)
     print("\nFeatures:")
     print("  - urllib.request (avoids GDELT 429 rate limit)")
-    print("  - OpenAI API (gpt-5-nano for summarization + tts-1 for TTS)")
+    print("  - Gemini API (summarization + Gemini TTS for natural voice)")
     print("  - Australian news filtering:")
     print("    * sourcecountry:AS (articles FROM Australia)")
     print("    * .au domain filtering")
@@ -1315,8 +1318,6 @@ if __name__ == '__main__':
     print("\nLimits: 3 news + 3 Reddit items (memory constraints)")
     print("Storage: pCloud folder /tts_australian")
     print("Updates: Use external cron to fetch fresh content periodically")
-    print("\nTTS: OpenAI tts-1 model (cheapest) with alloy voice")
-    print("Audio format: MP3 (audio/mpeg)")
     print("\n" + "="*70 + "\n")
 
     # Disable reloader to prevent duplicate calls

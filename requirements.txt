@@ -8,3 +8,4 @@ praw==7.8.1
 gunicorn
 pcloud==1.0a10
 requests==2.31.0
+openai==1.57.4

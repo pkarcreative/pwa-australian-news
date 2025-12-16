@@ -188,7 +188,7 @@ Text:
 Response:"""
 
             response = client.chat.completions.create(
-                model="gpt-5-nano",
+                model="gpt-5-nano-2025-08-07",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=0.3

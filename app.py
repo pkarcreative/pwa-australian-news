@@ -188,7 +188,7 @@ Text:
 Response:"""
 
             response = client.chat.completions.create(
-                model="gpt-5-nano-2025-08-07",
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=0.3
@@ -774,7 +774,7 @@ def fetch_reddit_discussions():
         for attempt in range(max_retries):
             try:
                 response = client.chat.completions.create(
-                    model="gpt-5-nano",
+                    model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=200,
                     temperature=0.3
